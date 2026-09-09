@@ -21,3 +21,5 @@ digital-pen-features-extraction
 ## Evaluation Overview
 
 _More details coming soon_
+
+[SynapseWorkflowOrchestrator]: https://github.com/Sage-Bionetworks/SynapseWorkflowOrchestrator
