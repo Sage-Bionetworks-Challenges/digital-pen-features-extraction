@@ -1,7 +1,7 @@
 FROM python:3.12-slim
 
 # Set default working directory.
-WORKDIR /usr/local/bin
+WORKDIR /app
 
 # Copy over Python dependencies file and install.
 COPY requirements.txt .
