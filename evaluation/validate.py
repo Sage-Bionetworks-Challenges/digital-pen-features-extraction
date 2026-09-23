@@ -3,110 +3,79 @@
 """Validation script for digital pen features extraction submissions.
 
 Validation checks include:
-- All expected columns are present in the generated CSV file, where:
-    * `filename` contains strings
-    * `CenterPoint` contains strings, written as a x-y coordinate like: [(x, y)] or [(x.x, y.y)]
-    * All other columns contain numbers/floats
+- `filename` column is present and contains strings
+- File contains at least one feature column
 - File is not empty
-- No NaN values in any of the columns
+- Feature columns do not contain NaN values
 """
-
-import argparse
-import csv
 import json
-import re
 
 import pandas as pd
 import typer
 from typing_extensions import Annotated
 
-PREDICTION_COLS = {
-    "filename": str,
-    "CenterPoint": str,
-    "Circularity": float,
-    "RadiusRatio": float,
-    "RemovedPoints": float,
-    "Radius": float,
-    "CenterDeviation": float,
-    "HandsAngle": float,
-    "DensityRatio": float,
-    "BBRatio": float,
-    "LengthRatio": float,
-    "IntersectDistance": float,
-    "NumComponents": float,
-    "DigitRadiusMean": float,
-    "DigitRadiusStd": float,
-    "DigitAngleMean": float,
-    "DigitAngleStd": float,
-    "DigitAreaMean": float,
-    "DigitAreaStd": float,
-    "ExtraDigits": float,
-    "MissingDigits": float,
-    "LeftoverInk": float,
-    "PenPressure": float
-}
+ID_COLUMN = "filename"
+
+
+def check_feature_columns(file_cols: pd.Index) -> str:
+    """Validates that the file has at least one feature column."""
+    if len(file_cols) == 0:
+        return "Features file does not contain any feature columns."
+    return ""
 
 
 def check_nan_columns(df: pd.DataFrame) -> str:
     """Validates that columns do not contain NaN values."""
-    error = ""
+    nan_cols = []
+
+    # Check if index contains NaNs
+    if df.index.isna().any():
+        nan_cols.append(df.index.name or ID_COLUMN)
+
+    # Check data columns for NaNs
     if cols_with_nan := df.columns[df.isna().any()].tolist():
-        error = f"Found NaN values in the following columns: {cols_with_nan}."
-    return error
+        nan_cols.extend(cols_with_nan)
+
+    if nan_cols:
+        return f"Found NaN values in the following columns: {nan_cols}."
+    return ""
 
 
-def check_invalid_xy_coordinates(pred_col: pd.Series) -> str:
-    """
-    Validates that the value is a x-y coordinate written as: [(x, y)] or [(x.x, y.y)]
-    """
-    error = ""
-
-    # Account for spaces around commas and inside brackets/parentheses.
-    pattern = r"^\[\s*\(\s*[-]?\d*\.?\d+\s*,\s*[-]?\d*\.?\d+\s*\)\s*\]$"
-
-    # Identify entries that fail the regex pattern match
-    invalid_mask = ~pred_col.astype(str).str.match(pattern, na=False)
-    num_invalid = invalid_mask.sum()
-    if num_invalid > 0:
-        error = (
-            f"Found {num_invalid} invalid coordinate(s) in '{pred_col.name}'. "
-            f"Expected format is '[(x, y)]' or '[(x.x, y.y)]'"
-        )
-    return error
-
-
-def validate(pred_file: str) -> list[str] | filter:
+def validate(pred_file: str) -> list[str]:
     errors = []
-
-    # Check for expected columns.
-    file_cols = set(pd.read_csv(pred_file, nrows=0).columns)
-    expected_cols = set(PREDICTION_COLS.keys())
-    missing_cols = expected_cols - file_cols
-    if missing_cols:
-        errors.append(
-            f"Features file is missing the following required columns: {missing_cols}."
-        )
-
-    # Otherwise, check the contents of the predictions file.
-    else:
-        # truth = pd.read_csv(
-        #     gt_file,
-        #     usecols=GROUNDTRUTH_COLS,
-        #     dtype=GROUNDTRUTH_COLS,
-        # )
+    try:
         pred = pd.read_csv(
             pred_file,
-            usecols=PREDICTION_COLS,
-            dtype=PREDICTION_COLS,
             float_precision="round_trip",
+        ).set_index(ID_COLUMN)
+    except KeyError:
+        errors.append("Features file is missing the required 'filename' column.")
+    except pd.errors.EmptyDataError:
+        errors.append("Features file is empty.")
+    except (pd.errors.ParserError, ValueError):
+        errors.append(
+            "Features file contains malformed CSV formatting (e.g. unquoted fields containing commas, " 
+            "mismatched quotes, etc)."
         )
-        if pred.isna().all().all():
-            errors.append("Features file contains no data.")
+    except Exception as e:
+        errors.append(f"Failed to read features file: {e}")
+    else:
+        # Validate column structure first.
+        if header_errors := check_feature_columns(pred.columns):
+            errors.append(header_errors)
+        
+        # Next, validate file contents.
         else:
-            errors.append(check_nan_columns(pred))
-            errors.append(check_invalid_xy_coordinates(pred["CenterPoint"]))
+            # truth = pd.read_csv(
+            #     gt_file,
+            # ).set_index(ID_COLUMN)
+            if pred.isna().all().all():  # will return True if df has 0 rows OR all cells are NaN
+                errors.append("Features file only contains NaN values.")
+            else:
+                errors.append(check_nan_columns(pred))
+    
     # Remove any empty strings from the list before return.
-    return filter(None, errors)
+    return [err for err in errors if err] 
 
 
 def main(
