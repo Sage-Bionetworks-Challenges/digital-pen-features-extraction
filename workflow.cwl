@@ -35,15 +35,15 @@ inputs:
   organizersId:
     label: userID or teamID for the organizers team on Synapse
     type: string
-    default: "3379097" # Placeholder - MUST be updated
+    default: "3557798"
   groundtruthSynId:
     label: synID for the groundtruth file on Synapse
     type: string
     default: "syn123"  # Placeholder - MUST be updated
-  inputDir:
-    label: Absolute filepath to the input data directory on the host machine
-    type: string
-    default: "/home/user/input_data"  # Placeholder - MUST be updated
+  # inputDir:
+  #   label: Absolute filepath to the input data directory on the host machine
+  #   type: string
+  #   default: "/home/user/input_data"  # Placeholder - MUST be updated
 
   # ------------------------------------------------------------------------------
   # Optional challenge configuration - update as needed.
@@ -51,11 +51,11 @@ inputs:
   container_memory_limit:
     label: Memory limit for running the container (e.g. '4g' or '200m')
     type: string
-    default: "6g"
+    default: "8g"
   container_swap_limit:
     label: Swap limit for running the container (e.g. '4g' or '200m'). See https://docs.docker.com/engine/containers/resource_constraints/ for more details.
     type: string
-    default: "6g"
+    default: "8g"
   container_time_limit:
     label: Time limit (in seconds) for running the container
     type: int
@@ -133,6 +133,15 @@ steps:
         source: "#synapseConfig"
     out:
       - id: filepath
+  
+  02_get_task_entities:
+    doc: Get input directory based on task number
+    run: steps/get-task.cwl
+    in:
+      - id: queue
+        source: "#01_download_submission/evaluation_id"
+    out:
+      - id: input_dir
 
   02_run_docker:
     doc: >
@@ -152,7 +161,7 @@ steps:
       - id: store
         default: true
       - id: input_dir
-        source: "#inputDir"
+        source: "#02_get_task_entities/input_dir"
       - id: memory_limit
         source: "#container_memory_limit"
       - id: swap_limit
