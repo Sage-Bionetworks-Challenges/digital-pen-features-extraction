@@ -5,11 +5,6 @@ label: Score predictions
 
 requirements:
 - class: InlineJavascriptRequirement
-- class: InitialWorkDirRequirement
-  listing:
-  - entryname: score.py
-    entry:
-      $include: ../evaluation/score.py
 
 inputs:
 - id: pred_file
@@ -40,12 +35,12 @@ outputs:
     loadContents: true
 
 baseCommand:
-- python3
-- score.py
+- Rscript
+- score.R
 arguments:
 - prefix: -o
   valueFrom: results.json
 
 hints:
   DockerRequirement:
-    dockerPull: sagebionetworks/synapsepythonclient:v3.1.1   # TODO: update image as needed; see evaluation/README.md for more details.
+    dockerPull: docker.synapse.org/syn69926066/evaluation:v0.0

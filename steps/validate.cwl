@@ -5,11 +5,6 @@ doc: Validate predictions prior to scoring
 
 requirements:
 - class: InlineJavascriptRequirement
-- class: InitialWorkDirRequirement
-  listing:
-  - entryname: validate.py
-    entry:
-      $include: ../evaluation/validate.py
 
 inputs:
 - id: pred_file
@@ -54,4 +49,4 @@ arguments:
 
 hints:
   DockerRequirement:
-    dockerPull: sagebionetworks/synapsepythonclient:v3.1.1  # TODO: update image as needed; see evaluation/README.md for more details
+    dockerPull: docker.synapse.org/syn69926066/evaluation:v0.0
