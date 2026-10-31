@@ -330,7 +330,7 @@ steps:
   
   08_send_validation_results:
     doc: Send email of the validation results to the submitter
-    run: steps/email-validation-results.cwl
+    run: steps/email-fastlane-results.cwl
     in:
       - id: submissionid
         source: "#submissionId"
