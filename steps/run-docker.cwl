@@ -49,7 +49,7 @@ outputs:
 - id: predictions
   type: File?
   outputBinding:
-    glob: predictions.csv
+    glob: features.csv
 - id: results
   type: File
   outputBinding:
