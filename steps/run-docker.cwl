@@ -67,7 +67,7 @@ outputs:
     outputEval: $(JSON.parse(self[0].contents)['submission_errors'])
     loadContents: true
 
-baseCommand: python3
+baseCommand: [ "/home/ec2-user/miniconda/envs/synapse/bin/python" ]
 arguments:
 - valueFrom: $(inputs.docker_script.path)
 - prefix: -s
