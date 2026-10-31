@@ -146,7 +146,9 @@ def run_docker(syn, args, docker_client, output_dir_to_mount):
             name=container_name,
             network_disabled=True,
             mem_limit=args.container_memory_limit,
-            shm_size="1g",
+            memswap_limit=args.container_swap_limit,
+            shm_size=args.container_shm_size,
+            nano_cpus=int(8 * 1e9),  # 8 CPUs
             stderr=True,
         )
 
@@ -180,7 +182,7 @@ def main(args):
 
     status = "VALIDATED_DOCKER"
     invalid_reasons = ""
-    expected_output = "predictions.csv"
+    expected_output = "features.csv"
 
     # Initial check for valid Docker image submission; skip to end if invalid.
     if not args.docker_repository and not args.docker_digest:
@@ -267,12 +269,6 @@ if __name__ == "__main__":
         help="Absolute path to the input data directory",
     )
     parser.add_argument(
-        "--container_time_limit",
-        type=int,
-        default=7200,
-        help="Container execution timeout in seconds (default: 7200s / 2h)",
-    )
-    parser.add_argument(
         "--container_memory_limit",
         default="2g",
         help="Container memory limit (default: 2g). Must be at least 6m (6 megabytes)",
@@ -285,6 +281,17 @@ if __name__ == "__main__":
             "If this value is less than or equal to 'container_memory_limit', "
             "container will not have access to swap."
         ),
+    )
+    parser.add_argument(
+        "--container_shm_size",
+        default="1g",
+        help="Shared memory size for running the container (default: 1g).",
+    )
+    parser.add_argument(
+        "--container_time_limit",
+        type=int,
+        default=7200,
+        help="Container execution timeout in seconds (default: 7200s / 2h)",
     )
     parser.add_argument(
         "--store",

@@ -34,6 +34,10 @@ inputs:
   type: string?
   inputBinding:
     prefix: --container_memory_swap_limit
+- id: shm_size
+  type: string?
+  inputBinding:
+    prefix: --container_shm_size
 - id: time_limit
   type: int?
   inputBinding:
@@ -80,7 +84,4 @@ arguments:
   valueFrom: $(inputs.synapse_config.path)
 - prefix: -i
   valueFrom: $(inputs.input_dir)
-- prefix: -m
-  valueFrom: $(inputs.memory_limit)
-- prefix: -t
-  valueFrom: $(inputs.time_limit)
+
