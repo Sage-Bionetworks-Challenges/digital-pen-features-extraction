@@ -36,10 +36,10 @@ inputs:
     label: userID or teamID for the organizers team on Synapse
     type: string
     default: "3557798"
-  groundtruthSynId:
-    label: synID for the groundtruth file on Synapse
-    type: string
-    default: "syn123"  # Placeholder - MUST be updated
+  # groundtruthSynId:
+  #   label: synID for the groundtruth file on Synapse
+  #   type: string
+  #   default: "syn123"  # Placeholder - MUST be updated
   # inputDir:
   #   label: Absolute filepath to the input data directory on the host machine
   #   type: string
@@ -51,11 +51,15 @@ inputs:
   container_memory_limit:
     label: Memory limit for running the container (e.g. '4g' or '200m')
     type: string
-    default: "8g"
+    default: "12g"
   container_swap_limit:
     label: Swap limit for running the container (e.g. '4g' or '200m'). See https://docs.docker.com/engine/containers/resource_constraints/ for more details.
     type: string
-    default: "8g"
+    default: "12g"
+  container_shm_size:
+    label: Shared memory size for running the container (e.g. '4g' or '200m'). Useful to prevent errors/crashes in containers running heavy data pipelines or matrix calculations.
+    type: string
+    default: "4g"
   container_time_limit:
     label: Time limit (in seconds) for running the container
     type: int
@@ -122,17 +126,54 @@ steps:
       - id: evaluation_id
       - id: results
 
-  01_download_groundtruth:
-    doc: Download groundtruth file
-    run: |-
-      https://raw.githubusercontent.com/Sage-Bionetworks-Workflows/cwl-tool-synapseclient/v1.4/cwl/synapse-get-tool.cwl
-    in:
-      - id: synapseid
-        source: "#groundtruthSynId"
-      - id: synapse_config
-        source: "#synapseConfig"
-    out:
-      - id: filepath
+  # -- NOT CURRENTLY NEEDED FOR THE FASE LANE --
+  # 01_download_outcomes_and_demographics:
+  #   doc: Download the outcomes and demographics data
+  #   run: |-
+  #     https://raw.githubusercontent.com/Sage-Bionetworks-Workflows/cwl-tool-synapseclient/v1.4/cwl/synapse-get-tool.cwl
+  #   in:
+  #     - id: synapseid
+  #       valueFrom: "syn77946390"
+  #     - id: synapse_config
+  #       source: "#synapseConfig"
+  #   out:
+  #     - id: filepath
+
+  # 01_download_fhs_mapping:
+  #   doc: Download the FHS mapping file
+  #   run: |-
+  #     https://raw.githubusercontent.com/Sage-Bionetworks-Workflows/cwl-tool-synapseclient/v1.4/cwl/synapse-get-tool.cwl
+  #   in:
+  #     - id: synapseid
+  #       valueFrom: "syn77948092"
+  #     - id: synapse_config
+  #       source: "#synapseConfig"
+  #   out:
+  #     - id: filepath
+
+  # 01_download_train_split:
+  #   doc: Download the train split ids
+  #   run: |-
+  #     https://raw.githubusercontent.com/Sage-Bionetworks-Workflows/cwl-tool-synapseclient/v1.4/cwl/synapse-get-tool.cwl
+  #   in:
+  #     - id: synapseid
+  #       valueFrom: "syn77948280"
+  #     - id: synapse_config
+  #       source: "#synapseConfig"
+  #   out:
+  #     - id: filepath
+
+  # 01_download_test_split:
+  #   doc: Download the test split ids
+  #   run: |-
+  #     https://raw.githubusercontent.com/Sage-Bionetworks-Workflows/cwl-tool-synapseclient/v1.4/cwl/synapse-get-tool.cwl
+  #   in:
+  #     - id: synapseid
+  #       valueFrom: "syn77948279"
+  #     - id: synapse_config
+  #       source: "#synapseConfig"
+  #   out:
+  #     - id: filepath
   
   02_get_task_entities:
     doc: Get input directory based on task number
@@ -145,7 +186,8 @@ steps:
 
   02_run_docker:
     doc: >
-      Run the participant Docker container against the input data to generate predictions
+      Run the participant Docker container against the fast lane data (small
+      subset of the training data) to generate a features CSV file
     run: steps/run-docker.cwl
     in:
       - id: docker_repository
@@ -166,6 +208,8 @@ steps:
         source: "#container_memory_limit"
       - id: swap_limit
         source: "#container_swap_limit"
+      - id: shm_size
+        source: "#container_shm_size"
       - id: time_limit
         source: "#container_time_limit"
       - id: docker_script
@@ -277,8 +321,6 @@ steps:
     in:
       - id: pred_file
         source: "#02_run_docker/predictions"
-      - id: groundtruth_file
-        source: "#01_download_groundtruth/filepath"
       - id: previous_annotation_finished
         source: "#06_annotate_docker_upload_results/finished"
     out:
@@ -288,8 +330,7 @@ steps:
   
   08_send_validation_results:
     doc: Send email of the validation results to the submitter
-    run: |-
-      https://raw.githubusercontent.com/Sage-Bionetworks/ChallengeWorkflowTemplates/v4.1/cwl/validate_email.cwl
+    run: steps/email-validation-results.cwl
     in:
       - id: submissionid
         source: "#submissionId"
@@ -297,10 +338,8 @@ steps:
         source: "#synapseConfig"
       - id: status
         source: "#07_validate/status"
-      - id: invalid_reasons
+      - id: submission_errors
         source: "#07_validate/invalid_reasons"
-      - id: errors_only
-        source: "#errors_only"
     out: [finished]
 
   08_add_validation_annots:
@@ -338,66 +377,91 @@ steps:
         source: "#08_send_validation_results/finished"
     out: [finished]
 
-  10_score:
-    run: steps/score.cwl
-    in:
-      - id: pred_file
-        source: "#02_run_docker/predictions"
-      - id: groundtruth_file
-        source: "#01_download_groundtruth/filepath"
-      - id: task_number
-        source: "#01_download_submission/evaluation_id"
-      - id: check_validation_finished
-        source: "#09_check_validation_status/finished"
-    out:
-      - id: results
-      - id: status
-      
-  11_send_score_results:
-    doc: >
-      Send email of the evaluation status (optionally with scores) to the submitter
-    run: |-
-      https://raw.githubusercontent.com/Sage-Bionetworks/ChallengeWorkflowTemplates/v4.1/cwl/score_email.cwl
-    in:
-      - id: submissionid
-        source: "#submissionId"
-      - id: synapse_config
-        source: "#synapseConfig"
-      - id: results
-        source: "#10_score/results"
-      - id: private_annotations
-        source: "#private_annotations"
-    out: []
+  # -- NOT CURRENTLY NEEDED FOR THE FASE LANE --
+  # 10_score:
+  #   run: steps/score.cwl
+  #   in:
+  #     - id: pred_file
+  #       source: "#02_run_docker/predictions"
+  #     - id: outcomes_file
+  #       source: "#01_download_outcomes_and_demographics/filepath"
+  #     - id: fhs_mapping_file
+  #       source: "#01_download_fhs_mapping/filepath"
+  #     - id: train_ids_file
+  #       source: "#01_download_train_split/filepath"
+  #     - id: test_ids_file
+  #       source: "#01_download_test_split/filepath"
+  #     - id: check_validation_finished
+  #       source: "#09_check_validation_status/finished"
+  #   out:
+  #     - id: results
+  #     - id: status
+  #     - id: score_output_file
 
-  11_add_score_annots:
-    doc: >
-      Update `submission_status` and add the scoring metric annotations
-    run: |-
-      https://raw.githubusercontent.com/Sage-Bionetworks/ChallengeWorkflowTemplates/v4.1/cwl/annotate_submission.cwl
-    in:
-      - id: submissionid
-        source: "#submissionId"
-      - id: annotation_values
-        source: "#10_score/results"
-      - id: to_public
-        default: true
-      - id: force
-        default: true
-      - id: synapse_config
-        source: "#synapseConfig"
-      - id: previous_annotation_finished
-        source: "#08_add_validation_annots/finished"
-    out: [finished]
+  # 10_upload_score_output:
+  #   doc: Upload the scoring pipeline's output list to the private submission folder
+  #   run: steps/upload-predictions.cwl
+  #   in:
+  #     - id: infile
+  #       source: "#10_score/score_output_file"
+  #     - id: parentid
+  #       source: "#adminUploadSynId"
+  #     - id: used_entity
+  #       source: "#01_download_submission/entity_id"
+  #     - id: executed_entity
+  #       source: "#workflowSynapseId"
+  #     - id: synapse_config
+  #       source: "#synapseConfig"
+  #   out:
+  #     - id: uploaded_fileid
+  #     - id: uploaded_file_version
+  #     - id: results
 
-  12_check_score_status:
-    doc: >
-      Check the scoring status of the submission; if 'INVALID', throw an
-      exception so that final status is 'INVALID' instead of 'ACCEPTED'
-    run: |-
-      https://raw.githubusercontent.com/Sage-Bionetworks/ChallengeWorkflowTemplates/v4.1/cwl/check_status.cwl
-    in:
-      - id: status
-        source: "#10_score/status"
-      - id: previous_annotation_finished
-        source: "#11_add_score_annots/finished"
-    out: [finished]
+  # 11_send_score_results:
+  #   doc: >
+  #     Send email of the evaluation status (optionally with scores) to the submitter
+  #   run: |-
+  #     https://raw.githubusercontent.com/Sage-Bionetworks/ChallengeWorkflowTemplates/v4.1/cwl/score_email.cwl
+  #   in:
+  #     - id: submissionid
+  #       source: "#submissionId"
+  #     - id: synapse_config
+  #       source: "#synapseConfig"
+  #     - id: results
+  #       source: "#10_score/results"
+  #     - id: private_annotations
+  #       source: "#private_annotations"
+  #   out: []
+
+  # 11_add_score_annots:
+  #   doc: >
+  #     Update `submission_status` and add the scoring metric annotations
+  #   run: |-
+  #     https://raw.githubusercontent.com/Sage-Bionetworks/ChallengeWorkflowTemplates/v4.1/cwl/annotate_submission.cwl
+  #   in:
+  #     - id: submissionid
+  #       source: "#submissionId"
+  #     - id: annotation_values
+  #       source: "#10_score/results"
+  #     - id: to_public
+  #       default: true
+  #     - id: force
+  #       default: true
+  #     - id: synapse_config
+  #       source: "#synapseConfig"
+  #     - id: previous_annotation_finished
+  #       source: "#08_add_validation_annots/finished"
+  #   out: [finished]
+
+  # 12_check_score_status:
+  #   doc: >
+  #     Check the scoring status of the submission; if 'INVALID', throw an
+  #     exception so that final status is 'INVALID' instead of 'ACCEPTED'
+  #   run: |-
+  #     https://raw.githubusercontent.com/Sage-Bionetworks/ChallengeWorkflowTemplates/v4.1/cwl/check_status.cwl
+  #   in:
+  #     - id: status
+  #       source: "#10_score/status"
+  #     - id: previous_annotation_finished
+  #       source: "#11_add_score_annots/finished"
+  #   out: [finished]
