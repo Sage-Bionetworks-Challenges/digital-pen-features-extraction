@@ -11,14 +11,22 @@ inputs:
   type: File
   inputBinding:
     prefix: -p
-- id: groundtruth_file
+- id: outcomes_file
   type: File
   inputBinding:
-    prefix: -g
-- id: task_number
-  type: string?
+    prefix: --outcomes_file
+- id: fhs_mapping_file
+  type: File
   inputBinding:
-    prefix: -t
+    prefix: --fhs_mapping_file
+- id: train_ids_file
+  type: File
+  inputBinding:
+    prefix: --train_ids_file
+- id: test_ids_file
+  type: File
+  inputBinding:
+    prefix: --test_ids_file
 - id: check_validation_finished
   type: boolean?
 
@@ -33,10 +41,12 @@ outputs:
     glob: results.json
     outputEval: $(JSON.parse(self[0].contents)['submission_status'])
     loadContents: true
+- id: score_output_file
+  type: File
+  outputBinding:
+    glob: output_list.RData
 
-baseCommand:
-- Rscript
-- score.R
+baseCommand: score.R
 arguments:
 - prefix: -o
   valueFrom: results.json
