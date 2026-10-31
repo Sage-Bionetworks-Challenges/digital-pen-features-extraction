@@ -14,20 +14,21 @@ inputs:
 outputs:
 - id: input_dir
   type: string
+
 expression: |2-
 
   ${
 
-    // Task 1
+    // Task 1: command
     if (inputs.queue == "9616851") {
       return {
-        input_dir: "/home/ec2-user/task1",
+        input_dir: "/home/ec2-user/task1_fastlane",
       };
     } 
-    // Task 2
+    // Task 2: copy
     else if (inputs.queue == "9616852") {
       return {
-        input_dir: "/home/ec2-user/task2",
+        input_dir: "/home/ec2-user/task2_fastlane",
       }
     }
     else {
