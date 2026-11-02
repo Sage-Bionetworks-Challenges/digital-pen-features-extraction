@@ -37,12 +37,14 @@ requirements:
       message = [f"Hello {name},\n\n"]
       if args.status == 'INVALID':
         subject += "invalid"
-        message.append(args.submission_errors)
+        message.append(
+            f"Your Docker submission (ID: {args.submissionid}) was invalid, due to the following reasons:\n\n"
+            f"{args.submission_errors}")
       else:
         subject += "accepted"
         message.append(
             "Thank you for participating in the Digital Pen Feature Extraction Challenge!\n\n"
-            f"We have received your Docker model (Submission ID: {args.submissionid}). Your container has "
+            f"We have received your Docker submission (ID: {args.submissionid}). Your container has "
             "passed our preliminary check and executed successfully on a small subset of the data.\n\n"
             "<b>Please note:</b> A successful run on this minimal sample confirms basic execution, but does "
             "not guarantee success on the full evaluation test set. Final scoring will depend on your container "
